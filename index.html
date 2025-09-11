@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Food Delivery App — Design Patterns</title>
+  <style>
+    body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f8fafc;color:#1f2937;}
+    header{background:#0f172a;color:#f8fafc;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+    header h1{margin:0;font-size:20px}
+    header p{margin:0;font-size:13px;color:#94a3b8}
+    .container{display:grid;grid-template-columns:350px 1fr;gap:20px;padding:20px;max-width:1200px;margin:auto}
+    .card{background:white;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);padding:16px}
+    h2{margin-top:0;font-size:18px;color:#0f172a}
+    label{font-size:13px;color:#475569;margin-top:6px;display:block}
+    input,select{width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px}
+    .btn{cursor:pointer;background:#0ea5e9;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:14px;transition:.2s}
+    .btn:hover{background:#0284c7}
+    .btn.secondary{background:#e2e8f0;color:#0f172a}
+    .btn.secondary:hover{background:#cbd5e1}
+    .list{max-height:200px;overflow-y:auto;margin-top:8px}
+    .entity{padding:10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;background:#f8fafc}
+    .orders .order{border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;background:#f1f5f9}
+    .orders .order.selected{border-color:#0ea5e9;background:#e0f2fe}
+    .small{font-size:12px;color:#64748b}
+    .log{font-size:13px;line-height:1.4;max-height:200px;overflow-y:auto;background:#0f172a;color:#f1f5f9;padding:10px;border-radius:8px}
+    footer{text-align:center;font-size:12px;color:#64748b;padding:12px}
+    @media(max-width:900px){.container{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Food Delivery App</h1>
+      <p>Observer • Strategy • Command Patterns</p>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Left side: controls -->
+    <div>
+      <div class="card">
+        <h2>Create Order</h2>
+        <label>Customer Name</label>
+        <input id="customerName" value="Alice" />
+
+        <label>Restaurant</label>
+        <select id="restaurantSelect"></select>
+
+        <label>Delivery Strategy</label>
+        <select id="strategySelect">
+          <option value="standard">Standard</option>
+          <option value="express">Express</option>
+          <option value="coupon">Coupon/Free</option>
+        </select>
+
+        <label>Order Total (₹)</label>
+        <input id="orderTotal" type="number" value="250" />
+
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="placeBtn">Place Order</button>
+          <button class="btn secondary" id="cancelBtn">Cancel Selected</button>
+          <button class="btn secondary" id="trackBtn">Track Selected</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Restaurants</h2>
+        <div class="list" id="restaurantsList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Delivery Agents</h2>
+        <div class="list" id="agentsList"></div>
+      </div>
+    </div>
+
+    <!-- Right side: orders and log -->
+    <div>
+      <div class="card orders">
+        <h2>Orders</h2>
+        <div id="ordersContainer"></div>
+      </div>
+      <div class="card">
+        <h2>Event Log</h2>
+        <div id="log" class="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Built with Object-Oriented Principles & Behavioral Patterns Demo.
+  </footer>
+
+  <script>
+    // Logger
+    const logEl=document.getElementById('log');
+    function uiLog(msg){const d=document.createElement('div');d.textContent=msg;logEl.prepend(d);}
+
+    // Observer Pattern
+    class Restaurant{constructor(name){this.name=name;this.agents=new Set();}
+      subscribe(agent){this.agents.add(agent);}
+      notify(order){this.agents.forEach(a=>a.update(order,this));}
+    }
+    class DeliveryAgent{constructor(name){this.name=name;}
+      update(order,restaurant){uiLog(`Agent ${this.name} notified: Order ${order.id} at ${restaurant.name}`);}}
+
+    // Strategy Pattern
+    class StandardDelivery{calculate(total){return Math.max(30,Math.round(total*0.1));}}
+    class ExpressDelivery{calculate(total){return Math.round(Math.max(30,total*0.1)*1.5);}}
+    class CouponFree{calculate(){return 0;}}
+    function strategyFor(type){if(type==='express')return new ExpressDelivery();if(type==='coupon')return new CouponFree();return new StandardDelivery();}
+
+    // Command Pattern
+    class OrderManager{constructor(){this.orders=new Map();this.nextId=100;}createOrder(p){const id=this.nextId++;const o={id,...p,status:'PLACED'};this.orders.set(id,o);return o;}cancelOrder(id){const o=this.orders.get(id);if(o){o.status='CANCELLED';}return o;}trackOrder(id){return this.orders.get(id);} }
+
+    class PlaceOrderCommand{constructor(receiver,payload){this.receiver=receiver;this.payload=payload;}execute(){const order=this.receiver.createOrder(this.payload);order.deliveryFee=strategyFor(order.strategy).calculate(order.total);uiLog(`Order ${order.id} placed, Delivery fee: ₹${order.deliveryFee}`);order.restaurant.notify(order);return order;}}
+    class CancelOrderCommand{constructor(receiver,id){this.receiver=receiver;this.id=id;}execute(){const o=this.receiver.cancelOrder(this.id);if(o)uiLog(`Order ${o.id} cancelled`);return o;}}
+    class TrackOrderCommand{constructor(receiver,id){this.receiver=receiver;this.id=id;}execute(){const o=this.receiver.trackOrder(this.id);if(o)uiLog(`Track: Order ${o.id} status is ${o.status}`);return o;}}
+
+    // Setup
+    const restaurants=[new Restaurant('Spice Villa'),new Restaurant('Green Bowl'),new Restaurant('Burger Haven')];
+    const agents=[new DeliveryAgent('Ravi'),new DeliveryAgent('Sita'),new DeliveryAgent('Arjun')];
+    restaurants[0].subscribe(agents[0]);restaurants[0].subscribe(agents[1]);restaurants[1].subscribe(agents[1]);restaurants[2].subscribe(agents[2]);
+
+    const restaurantSelect=document.getElementById('restaurantSelect');
+    restaurants.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=r.name;restaurantSelect.appendChild(o);});
+
+    const restaurantsList=document.getElementById('restaurantsList');
+    restaurants.forEach(r=>{const div=document.createElement('div');div.className='entity';div.textContent=r.name;restaurantsList.appendChild(div);});
+
+    const agentsList=document.getElementById('agentsList');
+    agents.forEach(a=>{const div=document.createElement('div');div.className='entity';div.textContent=a.name;agentsList.appendChild(div);});
+
+    const ordersContainer=document.getElementById('ordersContainer');
+    const orderManager=new OrderManager();
+    let selectedOrderId=null;
+
+    function renderOrders(){ordersContainer.innerHTML='';orderManager.orders.forEach(o=>{const div=document.createElement('div');div.className='order'+(o.id===selectedOrderId?' selected':'');div.innerHTML=`<div><strong>Order ${o.id}</strong> — ${o.customer}<br><span class='small'>${o.restaurant.name} • ₹${o.total}+₹${o.deliveryFee} • ${o.status}</span></div>`;div.onclick=()=>{selectedOrderId=o.id;renderOrders();};ordersContainer.appendChild(div);});}
+
+    // Buttons
+    document.getElementById('placeBtn').onclick=()=>{const customer=document.getElementById('customerName').value;const restaurant=restaurants[restaurantSelect.value];const total=Number(document.getElementById('orderTotal').value);const strategy=document.getElementById('strategySelect').value;const cmd=new PlaceOrderCommand(orderManager,{customer,restaurant,total,strategy});cmd.execute();renderOrders();};
+    document.getElementById('cancelBtn').onclick=()=>{if(!selectedOrderId)return uiLog('No order selected');const cmd=new CancelOrderCommand(orderManager,selectedOrderId);cmd.execute();renderOrders();};
+    document.getElementById('trackBtn').onclick=()=>{if(!selectedOrderId)return uiLog('No order selected');const cmd=new TrackOrderCommand(orderManager,selectedOrderId);cmd.execute();};
+
+    // Seed demo
+    const demoCmd=new PlaceOrderCommand(orderManager,{customer:'Demo User',restaurant:restaurants[0],total:420,strategy:'standard'});demoCmd.execute();renderOrders();
+  </script>
+</body>
+</html>
